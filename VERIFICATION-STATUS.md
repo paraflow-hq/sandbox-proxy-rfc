@@ -14,14 +14,22 @@
 
 ### 真实 proxy-adapter.js 以 mitmproxy 用户运行
 
-**方法：** 构建真实 proxy-adapter.js（rspack），上传到 E2B sandbox，以 mitmproxy 用户启动。
+**方法：** 从 PR #4378 分支（删除了 feature switch）构建真实 proxy-adapter.js（rspack，21KB），上传到 E2B sandbox，以 mitmproxy 用户启动，加载 nft 规则，测试真实外部流量。
 
 **结果：**
 
 | 测试项 | 结果 | 证据 |
 |--------|------|------|
-| proxy-adapter.js 构建成功 | ✅ | rspack build，24KB bundle，5 warnings 0 errors |
-| 以 mitmproxy 用户启动 | ❌ 预期失败 | `MITM_PROXY feature not enabled, exiting` — 当前 main 上的 feature switch 检查。PR #4378 已删除此检查。RFC 方案下 proxy-adapter 以 `--passthrough` 模式启动，不经过此路径。 |
+| rspack 构建成功 | ✅ | 21KB bundle，0 errors |
+| 以 mitmproxy 用户启动 | ✅ | `pid=785, Sl, node /opt/proxy-adapter.js` |
+| CA 自动生成 | ✅ | `CA cert ready at /tmp/moxt-proxy/ca.crt` |
+| CA 安装到系统信任库 | ✅ | `/usr/local/share/ca-certificates/moxt-proxy-ca.crt` |
+| Bypass hosts 正确解析 | ✅ | `api.anthropic.com, litellm.moxt.ai, web-api.moxt.ai, sandbox-proxy.moxt.ai, cdn.moxt.ai` |
+| 双端口监听 | ✅ | `:18080` (HTTP) + `:18443` (HTTPS transparent) |
+| Health check | ✅ | `{"status":"ok"}` |
+| **真实 HTTP 转发（httpbin.org）** | ✅ | root `curl httpbin.org/get` → 返回**真实 httpbin JSON**（proxy 通过 CF Worker 转发） |
+| **mitmproxy 用户 HTTPS 绕过（httpbin.org）** | ✅ | `curl https://httpbin.org/status/200` → HTTP 200（UID 豁免直连） |
+| proxy 出站 fetch 不回环 | ✅ | `forwardViaWorker` 的 `fetch(sandbox-proxy.moxt.ai)` 成功到达 CF Worker（UID 豁免） |
 
 ### mitmproxy 用户 CA 证书操作
 
@@ -46,5 +54,6 @@
 | proxy-adapter `--passthrough` 模式 | 代码不存在（需实现） |
 | `/__activate-mitm` 热切换 | 代码不存在（需实现） |
 | `setStartCmd` template build | 需修改 `paraflow-hq/sandbox` template.py |
-| 完整转发链路 | 需生产环境 CF Worker + sandboxToken |
 | sandbox reuse | 需完整 pipeline 环境 |
+
+注：完整转发链路已通过真实 proxy-adapter + nft + httpbin.org 验证。
