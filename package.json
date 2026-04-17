@@ -18,7 +18,8 @@
     "test:lifecycle": "node tests/11-hotswitch-lifecycle.cjs",
     "test:edge": "node tests/12-production-edge-cases.cjs",
     "test:stress": "node tests/13-stress-and-resilience.cjs",
-    "test:moxt": "node tests/14-moxt-code-paths.cjs"
+    "test:moxt": "node tests/14-moxt-code-paths.cjs",
+    "test:final": "node tests/15-final-coverage.cjs"
   },
   "dependencies": {
     "@e2b/code-interpreter": "2.3.1",

@@ -610,6 +610,46 @@ pnpm build                                # rspack 构建
 
 **建议：** RFC 实施时考虑添加 `PROXY_BYPASS_HOSTS` 环境变量，支持逗号分隔的自定义 bypass host 列表，以便运维团队灵活配置。
 
+### 磁盘满时 cert 生成快速失败但不自动恢复
+
+**场景：** E2B sandbox 的 `/tmp` 磁盘空间耗尽时，新 host 的 MITM cert 生成失败。
+
+**验证（Suite 15 Section A）：**
+- 磁盘满时 proxy **不会挂起**（95ms 内快速失败）✅
+- 磁盘满时 proxy **不会崩溃**（进程存活）✅
+- 磁盘释放后**已缓存**的 cert 仍可用 ✅
+- 磁盘释放后新 host 的 cert 生成**可能不恢复**（openssl 临时文件状态污染）⚠️
+
+**影响：** 磁盘满是极端场景，但如果发生，proxy 需要重启才能恢复 cert 生成能力。已缓存的 host 不受影响。
+
+### `update-ca-certificates` 失败时 curl/wget 将无法验证 MITM 证书
+
+**场景：** E2B base image 缺少 `ca-certificates` 包，或 `update-ca-certificates` 执行失败。
+
+**验证（Suite 15 Section B）：**
+- Proxy 仍能启动（`PROXY_READY`）✅
+- CA cert 文件本身生成成功 ✅
+- `NODE_EXTRA_CA_CERTS` 作为备选方案有效（Node.js child process 可信任 MITM CA）✅
+- **curl/wget 将失败**（系统信任库未更新，certificate verify failed）⚠️
+- **显式指定 `--cacert` 可绕过**（`curl --cacert /tmp/moxt-proxy/ca.crt`）✅
+
+**影响：** Agent 如果使用 curl/wget/Python requests 且依赖系统信任库，MITM host 的 HTTPS 请求会失败。Node.js child process 通过 `NODE_EXTRA_CA_CERTS` 不受影响。
+
+**缓解：** `template.py` 必须安装 `ca-certificates` 包（已在实施计划中记录）。`buildProxyEnvVars()` 设置 `SSL_CERT_FILE`/`REQUESTS_CA_BUNDLE`/`CURL_CA_BUNDLE` 指向系统 CA 文件——前提是该文件已被 `update-ca-certificates` 更新。
+
+### proxy 对恶意/畸形输入的韧性（已验证）
+
+**验证（Suite 15 Section C-G）：**
+| 场景 | 结果 |
+|------|------|
+| Invalid JSON to `/__update-config` | 返回 400，proxy 存活 ✅ |
+| 截断的请求 body（Content-Length 不匹配） | Proxy 存活 ✅ |
+| 客户端在 `forwardDirect` 流传输中断开 | Proxy 存活，后续请求正常 ✅ |
+| 纯 HTTP 发送到 TLS 端口 18443 | 连接关闭，proxy 存活 ✅ |
+| 损坏的 TLS ClientHello 发送到 18443 | TLS alert 返回，proxy 存活 ✅ |
+| 缺少 Host header 的 HTTP 请求 | 返回 400，proxy 存活 ✅ |
+| 10 并发 HTTPS 到同一未缓存 host | 零 cert 失败，proxy 存活 ✅ |
+
 ## 实施计划
 
 1. **验证：** 修改 `paraflow-hq/sandbox` template.py，在 `setStartCmd` 中添加最小化代理 + nft 规则。构建模板，创建 sandbox，验证规则和代理在创建时即已生效。注意 template.py 需增加 `apt-get install -y nftables`（当前只安装了 iptables）。
