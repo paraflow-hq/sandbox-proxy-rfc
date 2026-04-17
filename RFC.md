@@ -504,6 +504,87 @@ mitmServer.emit('connection', clientSocket)  // HTTPS server 接管后会自行 
 - [ ] 新增的热切换代码应参考 `mitm-proxy.ts:routeConnection()` 的完整流程：`pause → removeListener → unshift → emit`
 - [ ] 热切换功能的集成测试必须包含"激活后立即发起 HTTPS 连接"的验证（对应 Suite 10 B5）
 
+### MITM server 必须用 `https.createServer`，不能用 `tls.createServer`
+
+**场景：** 热切换的 MITM server 需要接收 TLS Router 通过 `emit('connection')` 注入的 socket。
+
+**问题：** 使用 `tls.createServer` 创建 MITM server 时，注入的 socket TLS 握手失败（`SSL: UNEXPECTED_EOF_WHILE_READING`），即使 `pause()` 已正确调用。
+
+**根因：** `tls.createServer` 和 `https.createServer` 对 `emit('connection')` 注入 socket 的处理不同。`https.createServer` 内部正确处理了从 raw TCP socket 开始的 TLS 握手序列（因为它在 `http.Server` 基础上包装了 TLS 层）。`tls.createServer` 期望接管完整的 socket 生命周期，对外部注入的 socket 行为不一致。
+
+**修复：** MITM server 使用 `https.createServer`（与现有 `mitm-proxy.ts:156` 一致）。
+
+**验证：** Suite 10 B5 使用 `https.createServer` 通过，`tls.createServer` 失败。
+
+### E2B socat 拦截 `127.0.0.1` 端口的 TCP 连接
+
+**场景：** 在 E2B sandbox 内部通过 `curl`/`wget`/`fetch` 访问 `127.0.0.1:18080`。
+
+**问题：** 请求被 E2B 的 socat 端口转发进程拦截，而非直达 proxy-adapter。proxy-adapter 绑定在 `127.0.0.1:18080`，但 E2B socat 也在监听同端口（用于将 sandbox 端口暴露到外部）。结果是 `/__health` 和 `/__update-config` 等内部端点的请求被 socat 转发后改变了 HTTP 语义，proxy 将其当做普通转发请求处理。
+
+**影响范围：** 仅影响 sandbox **内部**对 proxy 的 loopback 访问。nft REDIRECT 流量（外部 HTTP/HTTPS → proxy）不受影响，因为 nft 直接改写目标端口。
+
+**规避方法：**
+- `/__health` 检查改用 PID 文件 + 进程存活检测（`kill -0 PID` + `ss` 端口检查）
+- `/__update-config` 和 `/__activate-mitm` 改用 Python raw socket 直连 `127.0.0.1:18080`（绕过 socat），或杀掉端口对应的 socat 进程
+
+**生产影响：** 无。生产中 parent-process.ts 在 sandbox 内部通过 `fetch('http://127.0.0.1:18080/...')` 调用这些端点，此时 socat 转发不会改变 HTTP 语义（因为 parent-process 的 fetch 发到的是 proxy 而非 socat 目标）。该问题仅在**测试环境**中通过 E2B SDK 远程执行命令时出现。
+
+**验证：** Suite 07 T7-T8、Suite 09 T1-T4 验证了通过杀 socat / raw socket 方式可以访问内部端点。
+
+### E2B template 需要安装 `nftables` 和 `ca-certificates` 包
+
+**场景：** 当前 `template.py` 安装了 `iptables` 但没有 `nftables`。proxy-adapter 的 `setupCa()` 调用 `update-ca-certificates` 将 MITM CA 安装到系统信任库。
+
+**问题：**
+1. nft 命令不存在——RFC 方案所有规则使用 nft，必须安装 `nftables` 包
+2. `update-ca-certificates` 失败——E2B base image 可能缺少 `ca-certificates` 包，导致 proxy 启动时 CA 安装失败（proxy 日志：`update-ca-certificates failed`）
+
+**修复：** `template.py` 中添加：
+```python
+.run_cmd("apt-get install -y nftables ca-certificates")
+```
+
+**验证：** Suite 07-10 的所有测试在 `setupSandbox()` 中显式安装这两个包后通过。
+
+### `flush ruleset` 的安全性
+
+**场景：** `nft-rules.conf` 以 `flush ruleset` 开头，清除所有 nft 规则后再加载 proxy 规则。
+
+**当前状态：** E2B sandbox 无预置 nft 规则（Suite 05 R1a 验证），`flush ruleset` 安全。
+
+**潜在风险：** 如果 E2B 未来在 base image 中添加自己的 nft 规则（如网络隔离），`flush ruleset` 会将其清除。
+
+**建议：** 将 `flush ruleset` 改为 `flush table ip proxy`（仅清除 proxy 表），或在 flush 前检查是否存在非 proxy 表：
+
+```
+# 安全写法
+table ip proxy {}           # 确保表存在
+flush table ip proxy        # 只清除 proxy 表
+delete table ip proxy       # 删除旧表
+table ip proxy { ... }      # 重新创建
+```
+
+**验证：** Suite 05 R1a 确认当前 E2B 无预置 nft 规则。此建议为防御性改进。
+
+### proxy-adapter.js bundle 必须从最新源码构建
+
+**场景：** 测试时使用了 moxt 仓库中已存在的 `sandbox/proxy-adapter.js` bundle（20KB，2026-04-10 构建）。
+
+**问题：** 该 bundle 缺少 `/__health` 和 `/__update-config` 端点——这些端点在源码中存在（`mitm-proxy.ts:190-215`），但 bundle 是从较早的代码构建的。所有依赖这两个端点的测试失败。
+
+**修复：** 从最新源码重新构建 bundle：
+```bash
+cd sandbox/sandbox-execution
+npx tsx scripts/gen-types-from-schema.ts  # 先生成类型
+pnpm build                                # rspack 构建
+# 输出: sandbox/proxy-adapter.js (24KB)
+```
+
+**教训：** 部署到 E2B template 之前，必须验证 proxy-adapter.js bundle 是从与 server-ts 相同的代码版本构建的。类型生成（`gen-types-from-schema.ts`）是构建的前置依赖，遗漏会导致构建失败。
+
+**验证：** Suite 07 使用重建后的 bundle（24KB）通过 25/25，旧 bundle（20KB）在端点测试中失败。
+
 ## 实施计划
 
 1. **验证：** 修改 `paraflow-hq/sandbox` template.py，在 `setStartCmd` 中添加最小化代理 + nft 规则。构建模板，创建 sandbox，验证规则和代理在创建时即已生效。注意 template.py 需增加 `apt-get install -y nftables`（当前只安装了 iptables）。
