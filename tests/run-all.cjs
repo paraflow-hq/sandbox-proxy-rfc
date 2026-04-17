@@ -19,6 +19,7 @@ const suites = [
   { name: '03-gap-coverage', file: '03-gap-coverage.cjs' },
   { name: '04-adversarial', file: '04-adversarial.cjs' },
   { name: '05-production-reality', file: '05-production-reality.cjs' },
+  { name: '06-passthrough-poc', file: '06-passthrough-poc.cjs' },
 ]
 
 const results = []
