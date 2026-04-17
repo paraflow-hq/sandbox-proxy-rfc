@@ -1,0 +1,20 @@
+{
+  "name": "sandbox-proxy-rfc",
+  "version": "1.0.0",
+  "description": "RFC: Sandbox Transparent Proxy Architecture — validation tests for E2B + nft skuid",
+  "type": "commonjs",
+  "scripts": {
+    "test": "node tests/run-all.cjs",
+    "test:components": "node tests/01-components.cjs",
+    "test:e2e": "node tests/02-e2e-lifecycle.cjs",
+    "test:gaps": "node tests/03-gap-coverage.cjs",
+    "test:adversarial": "node tests/04-adversarial.cjs"
+  },
+  "dependencies": {
+    "@e2b/code-interpreter": "2.3.1",
+    "e2b": "2.8.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
