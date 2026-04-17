@@ -14,7 +14,8 @@
     "test:real": "node tests/07-real-proxy-adapter.cjs",
     "test:extended": "node tests/08-extended-coverage.cjs",
     "test:deep": "node tests/09-deep-coverage.cjs",
-    "test:production": "node tests/10-production-sequence.cjs"
+    "test:production": "node tests/10-production-sequence.cjs",
+    "test:lifecycle": "node tests/11-hotswitch-lifecycle.cjs"
   },
   "dependencies": {
     "@e2b/code-interpreter": "2.3.1",
