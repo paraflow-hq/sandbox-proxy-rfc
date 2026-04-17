@@ -585,6 +585,16 @@ pnpm build                                # rspack 构建
 
 **验证：** Suite 07 使用重建后的 bundle（24KB）通过 25/25，旧 bundle（20KB）在端点测试中失败。
 
+### nft 规则先于 proxy 加载时 proxy 正常工作（已验证）
+
+**场景：** RFC 方案是 image-layer 架构——nft 规则烘焙进 snapshot，proxy 启动时规则已生效。之前所有测试都是先启动 proxy 再加载 nft 规则。
+
+**验证（Suite 13 Section A）：** 先加载 nft 规则，再启动 proxy-adapter。结果：
+- proxy 正常启动（`PROXY_READY`）：CA 生成成功，因为 `openssl` 和 `sudo update-ca-certificates` 是本地操作，不受 nft 网络规则影响
+- HTTP 转发、HTTPS MITM、UID 豁免全部正常
+
+**结论：** nft 规则先于 proxy 加载不会导致 proxy 启动失败。image-layer 架构的前提条件已验证。
+
 ## 实施计划
 
 1. **验证：** 修改 `paraflow-hq/sandbox` template.py，在 `setStartCmd` 中添加最小化代理 + nft 规则。构建模板，创建 sandbox，验证规则和代理在创建时即已生效。注意 template.py 需增加 `apt-get install -y nftables`（当前只安装了 iptables）。
