@@ -10,7 +10,8 @@
     "test:gaps": "node tests/03-gap-coverage.cjs",
     "test:adversarial": "node tests/04-adversarial.cjs",
     "test:reality": "node tests/05-production-reality.cjs",
-    "test:poc": "node tests/06-passthrough-poc.cjs"
+    "test:poc": "node tests/06-passthrough-poc.cjs",
+    "test:real": "node tests/07-real-proxy-adapter.cjs"
   },
   "dependencies": {
     "@e2b/code-interpreter": "2.3.1",
