@@ -595,6 +595,21 @@ pnpm build                                # rspack 构建
 
 **结论：** nft 规则先于 proxy 加载不会导致 proxy 启动失败。image-layer 架构的前提条件已验证。
 
+### Bypass hosts 没有独立的环境变量配置机制
+
+**场景：** 实施 RFC 时可能需要动态添加 bypass hosts（如新增外部 API 不需要 MITM 拦截）。
+
+**发现（Suite 14 Section A）：** `PROXY_BYPASS_HOSTS` 环境变量**不存在**于 moxt 代码库中。当前 bypass hosts 的来源仅有：
+
+1. 硬编码：`api.anthropic.com`
+2. 从 env URL 提取 hostname：`ANTHROPIC_BASE_URL`、`HTTP_PROXY_WORKER_URL`、`CDN_HOST`、`TXOM_ZIP_URL`、`MFS_S3_ENDPOINT`
+
+**影响：** 如果需要添加新的 bypass host（如新增 LLM 提供商），必须通过以下方式之一：
+- 在 `proxy-adapter.ts` 的 `buildBypassHosts()` 中硬编码
+- 通过上述 env URL 变量间接添加（设置一个包含该 hostname 的 URL）
+
+**建议：** RFC 实施时考虑添加 `PROXY_BYPASS_HOSTS` 环境变量，支持逗号分隔的自定义 bypass host 列表，以便运维团队灵活配置。
+
 ## 实施计划
 
 1. **验证：** 修改 `paraflow-hq/sandbox` template.py，在 `setStartCmd` 中添加最小化代理 + nft 规则。构建模板，创建 sandbox，验证规则和代理在创建时即已生效。注意 template.py 需增加 `apt-get install -y nftables`（当前只安装了 iptables）。
