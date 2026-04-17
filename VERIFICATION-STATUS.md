@@ -1,6 +1,6 @@
 # 验证状态
 
-## 总计：16 套件 282 项，全部通过 ✅
+## 总计：17 套件 307 项，全部通过 ✅
 
 所有测试在真实 E2B sandbox 中执行，非 mock。
 
@@ -79,6 +79,22 @@
 | Prep 零 ECONNRESET | 20 sequential requests，零错误 | E1-E2 |
 | activate-mitm | `/__activate-mitm` → `"activated": true` → mode=mitm | E3-E4 |
 | Post-MITM snapshot | proxy + nft 在 MITM 激活后 snapshot/restore 存活 | E6-E8 |
+
+## WebSocket 协议覆盖：1 套件 25 项 ✅
+
+透明代理拦截 TCP 80/443 上的所有流量，WebSocket（HTTP Upgrade）是必须覆盖的协议。
+
+| 套件 | 测试数 | 结果 |
+|------|--------|------|
+| 17-websocket | 25/25 | ws:// HTTP Upgrade 优雅处理（proxy 不 crash）、wss:// passthrough TCP 隧道全双工 echo、wss:// MITM TLS 终止、并发 WebSocket 韧性、UID 豁免 WebSocket 绕过 |
+
+### Suite 17 关键发现
+
+| 协议路径 | 行为 | 影响 |
+|---------|------|------|
+| ws:// → proxy HTTP handler | `forwardViaWorker` 用 `http.request + pipe`，**不传播 Upgrade** — 请求作为普通 HTTP GET 转发 | WebSocket over HTTP 不工作，但 proxy 不 crash |
+| wss:// → passthrough TLS router | raw TCP 隧道，所有字节透传 — **WebSocket 完整工作** | wss:// 在 passthrough 模式下无损 |
+| wss:// → MITM TLS router | proxy 终止 TLS 后走 HTTP 层 — 同 ws:// 限制 | MITM 模式下 wss:// WebSocket 不工作 |
 
 ## 仍待验证（需新代码实施后）
 

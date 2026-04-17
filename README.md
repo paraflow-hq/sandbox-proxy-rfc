@@ -69,9 +69,9 @@ E2B 内核 6.1.158 **禁用了** `CONFIG_NETFILTER_XT_MATCH_OWNER`（legacy ipta
 
 ## 验证状态
 
-### 16 套件 282 项，全部通过 ✅
+### 17 套件 307 项，全部通过 ✅
 
-所有测试在**真实 E2B sandbox** 中执行，包含 Firecracker snapshot/restore 周期。Suite 07-15 使用**真实 rspack 构建的 proxy-adapter.js（24KB bundle）**。Suite 10-11 使用**自写的 passthrough → MITM 热切换实现**验证 RFC 核心新机制。Suite 16 使用 **E2B Template SDK `setStartCmd` API** 构建真实模板，验证生产 build 路径。
+所有测试在**真实 E2B sandbox** 中执行，包含 Firecracker snapshot/restore 周期。Suite 07-15 使用**真实 rspack 构建的 proxy-adapter.js（24KB bundle）**。Suite 10-11 使用**自写的 passthrough → MITM 热切换实现**验证 RFC 核心新机制。Suite 16 使用 **E2B Template SDK `setStartCmd` API** 构建真实模板，验证生产 build 路径。Suite 17 覆盖 **WebSocket（ws:// / wss://）** 透明代理行为。
 
 | 套件 | 测试数 | 使用的代理 | 覆盖内容 |
 |------|--------|-----------|---------|
@@ -91,6 +91,7 @@ E2B 内核 6.1.158 **禁用了** `CONFIG_NETFILTER_XT_MATCH_OWNER`（legacy ipta
 | **14-moxt-code-paths** | 21 ✅ | **真实 bundle** | bypass hosts env 解析、feature switch 禁用、缺失 env vars、TLS monkey-patch 深度验证 |
 | **15-final-coverage** | 29 ✅ | **真实 bundle** | 磁盘满、缺失 update-ca-certificates、畸形输入、客户端中断、坏 TLS 数据、并发同 host cert |
 | **16-setStartCmd-template-build** | 29 ✅ | **Template SDK build** | `setStartCmd` 真实模板构建、proxy + nft 从 sandbox 创建即生效、UID 豁免、snapshot/restore、多 sandbox 隔离、完整 RFC 生命周期 |
+| **17-websocket** | 25 ✅ | **真实 bundle + 热切换** | ws:// HTTP Upgrade 优雅处理、wss:// passthrough TCP 隧道全双工 echo、wss:// MITM TLS 终止、并发 WebSocket 韧性、UID 豁免 WebSocket 绕过 |
 
 ### 关键证据摘要
 
@@ -111,6 +112,8 @@ E2B 内核 6.1.158 **禁用了** `CONFIG_NETFILTER_XT_MATCH_OWNER`（legacy ipta
 | **混合工作负载** | 10 HTTP + 5 bypass + 5 MITM 并发，零 ECONNRESET | 12 E2 |
 | **setStartCmd build 路径** | Template SDK 构建真实模板 → sandbox 创建即 proxy + nft 就绪 → UID 豁免有效 | 16 A1-B10 |
 | **Template sandbox 多实例隔离** | 同 template 创建多 sandbox，proxy/nft 独立，请求不串 | 16 D1-D5 |
+| **WebSocket wss:// passthrough** | raw TCP 隧道全双工 echo，WebSocket 帧完整通过 | 17 B1-B5 |
+| **WebSocket ws:// 优雅处理** | HTTP Upgrade 不传播但 proxy 不 crash，正常返回 HTTP 响应 | 17 A1-A5 |
 
 ### 仍待验证（需新代码实施后）
 
@@ -189,6 +192,7 @@ pnpm test:stress <key>         # 13: 压力与韧性（25 tests）
 pnpm test:moxt <key>           # 14: moxt 代码路径（21 tests）
 pnpm test:final <key>          # 15: 终极覆盖（29 tests）
 pnpm test:template <key>       # 16: setStartCmd 模板构建（29 tests）
+pnpm test:websocket <key>      # 17: WebSocket 透明代理（25 tests）
 ```
 
 ## 文件结构
@@ -212,7 +216,8 @@ tests/
 ├── 13-stress-and-resilience.cjs # 压力与韧性（25）
 ├── 14-moxt-code-paths.cjs     # moxt 代码路径（21）
 ├── 15-final-coverage.cjs      # 终极覆盖（29）
-└── 16-setStartCmd-template-build.cjs # setStartCmd 模板构建（29）
+├── 16-setStartCmd-template-build.cjs # setStartCmd 模板构建（29）
+└── 17-websocket.cjs           # WebSocket 透明代理（25）
 
 fixtures/
 ├── proxy.py                   # Python proxy 模拟器（Suite 01-05）
