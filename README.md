@@ -69,7 +69,7 @@ E2B 内核 6.1.158 **禁用了** `CONFIG_NETFILTER_XT_MATCH_OWNER`（legacy ipta
 
 ## 验证状态
 
-### 15 套件 241 项，全部通过 ✅
+### 15 套件 253 项，全部通过 ✅
 
 所有测试在**真实 E2B sandbox** 中执行，包含 Firecracker snapshot/restore 周期。Suite 07-15 使用**真实 rspack 构建的 proxy-adapter.js（24KB bundle）**。Suite 10-11 使用**自写的 passthrough → MITM 热切换实现**验证 RFC 核心新机制。
 
@@ -226,7 +226,7 @@ fixtures/
 
 ## 文档
 
-- **[RFC.md](./RFC.md)** — 完整 RFC：问题分析、方案设计、实施计划、实施注意事项（8 个踩坑记录）
+- **[RFC.md](./RFC.md)** — 完整 RFC：问题分析、方案设计、实施计划、实施注意事项（10 个踩坑记录）
 - **[VERIFICATION-STATUS.md](./VERIFICATION-STATUS.md)** — 验证状态跟踪
 - **[INDEPENDENT-ANALYSIS.md](./INDEPENDENT-ANALYSIS.md)** — 独立分析：RFC vs 当前架构的事实对比
 
