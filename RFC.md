@@ -652,11 +652,108 @@ pnpm build                                # rspack 构建
 
 ## 实施计划
 
-1. **验证：** 修改 `paraflow-hq/sandbox` template.py，在 `setStartCmd` 中添加最小化代理 + nft 规则。构建模板，创建 sandbox，验证规则和代理在创建时即已生效。注意 template.py 需增加 `apt-get install -y nftables`（当前只安装了 iptables）。
-2. **实现代理直通模式：** 修改 proxy-adapter，支持无 CA 启动，HTTPS 默认 TCP 透传。新增 `/__activate-mitm` 端点。
-3. **实现 parent-process 改动：** 删除运行时 iptables/spawn 逻辑。在 prep 阶段后添加 `activateMitm()` 调用。
-4. **端到端测试：** 在 dev 环境完整运行 pipeline。验证：prep 期间无 ECONNRESET、Agent 前 MITM 已激活、sandbox reuse 正常。
-5. **部署：** 重新构建模板 + 部署 server-ts。已有 sandbox 继续使用运行时 iptables（来自之前的运行）。新 sandbox 使用镜像层规则。
+### 步骤 1：修改 E2B template（`paraflow-hq/sandbox`）
+
+**改什么：** `template.py`
+
+```python
+# 新增安装 nftables
+.run_cmd("apt-get install -y nftables ca-certificates")
+
+# 新增 setStartCmd：以 mitmproxy 用户启动 proxy + 加载 nft 规则
+.copy('proxy-adapter.js', '/opt/moxt-proxy/proxy-adapter.js')
+.copy('nft-rules.conf', '/opt/moxt-proxy/nft-rules.conf')
+.set_start_cmd(
+    "sudo -u mitmproxy node /opt/moxt-proxy/proxy-adapter.js --passthrough & nft -f /opt/moxt-proxy/nft-rules.conf",
+    wait_for_port(18080)
+)
+```
+
+**参考文件：** `fixtures/nft-rules.conf`（本仓库，已在 E2B 中验证通过）
+
+**验证方法：** 构建模板 → 创建 sandbox → 检查 proxy 进程运行 + nft 规则已生效
+
+**注意：**
+- 必须安装 `nftables`（当前 template.py 只安装了 `iptables`）
+- 必须安装 `ca-certificates`（`update-ca-certificates` 依赖它）
+- `nft-rules.conf` 中建议将 `flush ruleset` 改为 `flush table ip proxy`（防御性）
+
+### 步骤 2：修改 proxy-adapter 支持 passthrough + 热切换
+
+**改什么：** `sandbox/sandbox-execution/src/proxy-adapter/`
+
+**改动清单：**
+1. `proxy-adapter.ts`：添加 `--passthrough` CLI flag。无 flag 时行为不变（当前 MITM 模式）；有 flag 时跳过 `setupCa()`，以 passthrough 模式启动
+2. `mitm-proxy.ts`：
+   - `startMitmProxy()` 接受新参数 `passthrough: boolean`
+   - passthrough 模式下：TLS router 对所有 host TCP 透传（当前仅 bypass hosts 透传）
+   - 新增 `/__activate-mitm` 端点：接受 `{ caCertPath, caKeyPath, sandboxToken, pipelineId, bypassHosts }`，初始化 `DynamicCertManager`，切换 TLS router 模式
+3. 删除 `BYPASS_PORT_BASE`/`BYPASS_PORT_COUNT`/`randomBypassPort()`（UID 豁免替代端口范围）
+4. 删除 `tunnelBypass()` 中的 `localPort` 绑定（UID 豁免后不需要绑定特定端口）
+
+**参考实现：** `fixtures/passthrough-hotswitch.mjs`（本仓库，241 项测试验证）
+
+**关键注意事项：**
+- TLS router 切换到 MITM 时**必须** `clientSocket.pause()` 在 `unshift + emit` 之前（见"实施注意事项"第 1 条）
+- MITM server **必须**用 `https.createServer`（见第 2 条）
+- 构建后必须重新 rspack build：`cd sandbox/sandbox-execution && npx tsx scripts/gen-types-from-schema.ts && pnpm build`
+
+### 步骤 3：修改 parent-process.ts
+
+**改什么：** `server-ts/src/backend/component/pipeline/sandbox-scripts/transparent-proxy.ts` + `parent-process.ts`
+
+**删除：**
+- `setupIptablesTransparentProxy()` / `cleanupIptablesTransparentProxy()` / `ensureIptablesTransparentProxy()`
+- `startProxyAdapterIfAvailable()` 中的 spawn 逻辑（proxy 已在 snapshot 中运行）
+- `BYPASS_PORT_BASE` / `BYPASS_PORT_RANGE` 常量
+- 所有 `execSync`/`execAsync` iptables 命令
+
+**保留：**
+- `setupCa()` → 运行时生成 CA（不放入 snapshot）
+- `trustMitmCaCertForParentProcess()` → monkey-patch tls.createSecureContext
+- `trustExistingProxyCaIfPresent()` → sandbox reuse 路径
+
+**新增：**
+```typescript
+async function activateMitm(): Promise<void> {
+    const { caCertPath, caKeyPath } = setupCa()
+    installCaToSystemTrustStore()
+    trustMitmCaCertForParentProcess()
+
+    await fetch('http://127.0.0.1:18080/__activate-mitm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            caCertPath, caKeyPath,
+            sandboxToken: getEnv('SANDBOX_TOOL_API_TOKEN'),
+            pipelineId: getEnv('MOXT_PIPELINE_ID'),
+            bypassHosts: [...buildBypassHosts()],
+        }),
+    })
+}
+```
+
+**调用位置：** `parent-process.ts main()` 中，prep 阶段完成后、Agent spawn 之前
+
+**参考实现：** `fixtures/production-sequence.mjs`（monkey-patch + 全序列验证）
+
+### 步骤 4：dev 环境端到端测试
+
+**验证清单：**
+- [ ] 从新模板创建 sandbox，proxy 和 nft 规则在创建时即已生效
+- [ ] Parent-process prep 阶段：零 ECONNRESET
+- [ ] `activateMitm()` 调用成功
+- [ ] Agent 的 HTTPS 请求被 MITM 拦截
+- [ ] Agent 的 Anthropic API 调用（bypass host）正常
+- [ ] Sandbox reuse：第二次 pipeline 检测到已有 proxy + 更新 config
+- [ ] P0 回归：故意从 bypassHosts 移除 HTTP_PROXY_WORKER_URL → 不回环
+
+### 步骤 5：部署
+
+- 重新构建 E2B template（`paraflow-hq/sandbox`）
+- 部署 server-ts（含 parent-process.ts 改动）
+- 新 sandbox 使用 image-layer nft 规则
+- 已有 sandbox 继续使用运行时 iptables（向后兼容）
 
 ## 参考资料
 
