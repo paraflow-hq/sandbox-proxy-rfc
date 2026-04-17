@@ -69,9 +69,9 @@ E2B 内核 6.1.158 **禁用了** `CONFIG_NETFILTER_XT_MATCH_OWNER`（legacy ipta
 
 ## 验证状态
 
-### 17 套件 307 项，全部通过 ✅
+### 18 套件 331 项，全部通过 ✅
 
-所有测试在**真实 E2B sandbox** 中执行，包含 Firecracker snapshot/restore 周期。Suite 07-15 使用**真实 rspack 构建的 proxy-adapter.js（24KB bundle）**。Suite 10-11 使用**自写的 passthrough → MITM 热切换实现**验证 RFC 核心新机制。Suite 16 使用 **E2B Template SDK `setStartCmd` API** 构建真实模板，验证生产 build 路径。Suite 17 覆盖 **WebSocket（ws:// / wss://）** 透明代理行为。
+所有测试在**真实 E2B sandbox** 中执行，包含 Firecracker snapshot/restore 周期。Suite 07-15 使用**真实 rspack 构建的 proxy-adapter.js（24KB bundle）**。Suite 10-11 使用**自写的 passthrough → MITM 热切换实现**验证 RFC 核心新机制。Suite 16 使用 **E2B Template SDK `setStartCmd` API** 构建真实模板，验证生产 build 路径。Suite 17 覆盖 **WebSocket（ws:// / wss://）** 透明代理行为。Suite 18 使用**真实 proxy-adapter.js 的 `--passthrough` + `/__activate-mitm`** 验证 RFC 完整热切换机制。
 
 | 套件 | 测试数 | 使用的代理 | 覆盖内容 |
 |------|--------|-----------|---------|
@@ -92,6 +92,7 @@ E2B 内核 6.1.158 **禁用了** `CONFIG_NETFILTER_XT_MATCH_OWNER`（legacy ipta
 | **15-final-coverage** | 29 ✅ | **真实 bundle** | 磁盘满、缺失 update-ca-certificates、畸形输入、客户端中断、坏 TLS 数据、并发同 host cert |
 | **16-setStartCmd-template-build** | 29 ✅ | **Template SDK build** | `setStartCmd` 真实模板构建、proxy + nft 从 sandbox 创建即生效、UID 豁免、snapshot/restore、多 sandbox 隔离、完整 RFC 生命周期 |
 | **17-websocket** | 25 ✅ | **真实 bundle + 热切换** | ws:// HTTP Upgrade 优雅处理、wss:// passthrough TCP 隧道全双工 echo、wss:// MITM TLS 终止、并发 WebSocket 韧性、UID 豁免 WebSocket 绕过 |
+| **18-real-passthrough-activate-mitm** | 24 ✅ | **真实 bundle（含 --passthrough + /__activate-mitm）** | passthrough 启动无 CA、health 报告模式、HTTP 直转、HTTPS 真实上游证书、激活 MITM 后 HTTPS 获得 Moxt CA 证书、snapshot/restore 存活、幂等激活 |
 
 ### 关键证据摘要
 
@@ -114,15 +115,13 @@ E2B 内核 6.1.158 **禁用了** `CONFIG_NETFILTER_XT_MATCH_OWNER`（legacy ipta
 | **Template sandbox 多实例隔离** | 同 template 创建多 sandbox，proxy/nft 独立，请求不串 | 16 D1-D5 |
 | **WebSocket wss:// passthrough** | raw TCP 隧道全双工 echo，WebSocket 帧完整通过 | 17 B1-B5 |
 | **WebSocket ws:// 优雅处理** | HTTP Upgrade 不传播但 proxy 不 crash，正常返回 HTTP 响应 | 17 A1-A5 |
+| **真实 --passthrough 启动** | proxy-adapter.js `--passthrough` 无 CA 启动，health 报告 passthrough | 18 A1-A4 |
+| **真实 /__activate-mitm** | CA 生成 → POST /__activate-mitm → HTTPS 获得 Moxt CA 证书 | 18 C3-D2 |
+| **Passthrough → MITM snapshot** | passthrough → activate → snapshot → restore → MITM 仍生效 | 18 E1-E5 |
 
-### 仍待验证（需新代码实施后）
+### 仍待验证（无）
 
-| 待验证项 | 原因 |
-|----------|------|
-| `--passthrough` CLI flag | proxy-adapter 代码不存在（需实现） |
-| `/__activate-mitm` 在真实 proxy-adapter 中 | 端点代码不存在（需实现，热切换已用独立实现验证） |
-
-这 2 项是**尚未编写的新代码**。其中热切换机制已通过独立实现（`passthrough-hotswitch.mjs`）在真实 E2B 环境中完整验证（Suite 10-12），`setStartCmd` build 路径已通过 Suite 16 在真实 E2B 环境中完整验证。
+所有待验证项已全部完成。`--passthrough` CLI flag 和 `/__activate-mitm` 端点已在真实 proxy-adapter.js bundle 中实现并通过 Suite 18（24/24）在真实 E2B 环境中验证。
 
 ### 源码覆盖率
 
@@ -193,6 +192,7 @@ pnpm test:moxt <key>           # 14: moxt 代码路径（21 tests）
 pnpm test:final <key>          # 15: 终极覆盖（29 tests）
 pnpm test:template <key>       # 16: setStartCmd 模板构建（29 tests）
 pnpm test:websocket <key>      # 17: WebSocket 透明代理（25 tests）
+pnpm test:passthrough <key>    # 18: 真实 --passthrough + /__activate-mitm（24 tests）
 ```
 
 ## 文件结构
@@ -217,7 +217,8 @@ tests/
 ├── 14-moxt-code-paths.cjs     # moxt 代码路径（21）
 ├── 15-final-coverage.cjs      # 终极覆盖（29）
 ├── 16-setStartCmd-template-build.cjs # setStartCmd 模板构建（29）
-└── 17-websocket.cjs           # WebSocket 透明代理（25）
+├── 17-websocket.cjs           # WebSocket 透明代理（25）
+└── 18-real-passthrough-activate-mitm.cjs # 真实 --passthrough + /__activate-mitm（24）
 
 fixtures/
 ├── proxy.py                   # Python proxy 模拟器（Suite 01-05）

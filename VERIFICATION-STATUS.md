@@ -1,6 +1,6 @@
 # 验证状态
 
-## 总计：17 套件 307 项，全部通过 ✅
+## 总计：18 套件 331 项，全部通过 ✅
 
 所有测试在真实 E2B sandbox 中执行，非 mock。
 
@@ -96,12 +96,28 @@
 | wss:// → passthrough TLS router | raw TCP 隧道，所有字节透传 — **WebSocket 完整工作** | wss:// 在 passthrough 模式下无损 |
 | wss:// → MITM TLS router | proxy 终止 TLS 后走 HTTP 层 — 同 ws:// 限制 | MITM 模式下 wss:// WebSocket 不工作 |
 
-## 仍待验证（需新代码实施后）
+## 真实 proxy-adapter --passthrough + /__activate-mitm：1 套件 24 项 ✅
 
-| 待验证项 | 阻塞原因 |
-|----------|----------|
-| proxy-adapter `--passthrough` 模式 | 代码不存在（需实现） |
-| `/__activate-mitm` 在真实 proxy-adapter 中 | 代码不存在（需实现，热切换已用独立实现验证） |
+真实 proxy-adapter.js bundle（25KB, rspack 构建）实现 `--passthrough` flag 和 `/__activate-mitm` 端点。
+
+| 套件 | 测试数 | 结果 |
+|------|--------|------|
+| 18-real-passthrough-activate-mitm | 24/24 | passthrough 启动无 CA、health=passthrough、HTTP 直转、HTTPS 真实上游证书、10 请求零 ECONNRESET、UID 豁免、CA 生成 + activate-mitm、HTTPS 获得 Moxt CA、snapshot/restore 存活、幂等激活 |
+
+### Suite 18 关键证据
+
+| 验证目标 | 证据 | 测试 |
+|---------|------|------|
+| `--passthrough` 启动 | health 返回 `"mode":"passthrough"`，无 CA 文件 | A1-A3 |
+| Passthrough HTTPS | 上游真实证书 `issuer=C=US, O=Amazon` | B2 |
+| `/__activate-mitm` | 返回 `{"activated":true,"mode":"mitm"}` | C3 |
+| MITM 生效 | HTTPS cert `issuer=CN=Moxt Sandbox Proxy CA` | D1-D2 |
+| Snapshot 存活 | proxy + nft + MITM 模式在 restore 后全部存活 | E1-E5 |
+| 幂等激活 | 双次 activate 不 crash，MITM 继续工作 | F1-F3 |
+
+## 仍待验证（无）
+
+所有待验证项已全部完成。
 
 ## 测试中发现的实施注意事项
 

@@ -21,7 +21,8 @@
     "test:moxt": "node tests/14-moxt-code-paths.cjs",
     "test:final": "node tests/15-final-coverage.cjs",
     "test:template": "node tests/16-setStartCmd-template-build.cjs",
-    "test:websocket": "node tests/17-websocket.cjs"
+    "test:websocket": "node tests/17-websocket.cjs",
+    "test:passthrough": "node tests/18-real-passthrough-activate-mitm.cjs"
   },
   "dependencies": {
     "@e2b/code-interpreter": "2.3.1",
