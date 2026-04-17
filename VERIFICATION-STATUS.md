@@ -143,3 +143,4 @@ Suite 16 用 Python proxy + setStartCmd。Suite 18 用真实 proxy-adapter --pas
 | 8 | Bypass hosts 没有独立 env var 配置机制 | Suite 14 A | 只能通过 URL env vars 间接添加 |
 | 9 | 磁盘满时 cert gen 快速失败但不自动恢复 | Suite 15 A | 需重启 proxy |
 | 10 | `update-ca-certificates` 失败时 curl/wget 将无法验证 MITM 证书 | Suite 15 B | NODE_EXTRA_CA_CERTS 可用作备选 |
+| 11 | E2B sandbox 无 IPv6 全局连接——`table ip proxy`（IPv4-only）足够 | 实测 `ip -6 route` + `curl -6` | nft 规则不需要 `table ip6 proxy`；Node.js `autoSelectFamily` 尝试 IPv6 会立即失败并 fallback IPv4 |

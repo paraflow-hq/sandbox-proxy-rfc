@@ -314,6 +314,8 @@ NFT
 
 这遵循了 E2B 官方 IP tunneling 文档中展示的模式（`setStartCmd` + 网络规则），并采用了 Istio/Linkerd/mitmproxy 统一使用的 UID 豁免防回环机制（通过 nft `meta skuid` 实现，而非 legacy iptables `--uid-owner`）。
 
+**IPv6 说明：** nft 规则使用 `table ip proxy`（IPv4-only），不包含 `table ip6 proxy`。实测确认 E2B sandbox 无 IPv6 全局路由（`ip -6 route` 仅有 `fe80::/64` link-local，`curl -6 http://example.com` 连接失败），所有外部流量走 IPv4。Node.js `autoSelectFamily`（Happy Eyeballs）尝试 IPv6 会立即失败并 fallback IPv4，不存在 IPv6 流量绕过 nft 规则的风险。若 E2B 未来启用 IPv6 全局路由，需添加 `table ip6 proxy` 镜像规则。
+
 ### 3. parent-process.ts 简化
 
 **删除：**
