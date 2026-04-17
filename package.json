@@ -19,7 +19,8 @@
     "test:edge": "node tests/12-production-edge-cases.cjs",
     "test:stress": "node tests/13-stress-and-resilience.cjs",
     "test:moxt": "node tests/14-moxt-code-paths.cjs",
-    "test:final": "node tests/15-final-coverage.cjs"
+    "test:final": "node tests/15-final-coverage.cjs",
+    "test:template": "node tests/16-setStartCmd-template-build.cjs"
   },
   "dependencies": {
     "@e2b/code-interpreter": "2.3.1",

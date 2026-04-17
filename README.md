@@ -69,9 +69,9 @@ E2B 内核 6.1.158 **禁用了** `CONFIG_NETFILTER_XT_MATCH_OWNER`（legacy ipta
 
 ## 验证状态
 
-### 15 套件 253 项，全部通过 ✅
+### 16 套件 282 项，全部通过 ✅
 
-所有测试在**真实 E2B sandbox** 中执行，包含 Firecracker snapshot/restore 周期。Suite 07-15 使用**真实 rspack 构建的 proxy-adapter.js（24KB bundle）**。Suite 10-11 使用**自写的 passthrough → MITM 热切换实现**验证 RFC 核心新机制。
+所有测试在**真实 E2B sandbox** 中执行，包含 Firecracker snapshot/restore 周期。Suite 07-15 使用**真实 rspack 构建的 proxy-adapter.js（24KB bundle）**。Suite 10-11 使用**自写的 passthrough → MITM 热切换实现**验证 RFC 核心新机制。Suite 16 使用 **E2B Template SDK `setStartCmd` API** 构建真实模板，验证生产 build 路径。
 
 | 套件 | 测试数 | 使用的代理 | 覆盖内容 |
 |------|--------|-----------|---------|
@@ -90,6 +90,7 @@ E2B 内核 6.1.158 **禁用了** `CONFIG_NETFILTER_XT_MATCH_OWNER`（legacy ipta
 | **13-stress-and-resilience** | 25 ✅ | **真实 bundle** | nft-先于-proxy 验证、100 请求 burst、错误韧性、二进制 payload、20 host cert 生成 |
 | **14-moxt-code-paths** | 21 ✅ | **真实 bundle** | bypass hosts env 解析、feature switch 禁用、缺失 env vars、TLS monkey-patch 深度验证 |
 | **15-final-coverage** | 29 ✅ | **真实 bundle** | 磁盘满、缺失 update-ca-certificates、畸形输入、客户端中断、坏 TLS 数据、并发同 host cert |
+| **16-setStartCmd-template-build** | 29 ✅ | **Template SDK build** | `setStartCmd` 真实模板构建、proxy + nft 从 sandbox 创建即生效、UID 豁免、snapshot/restore、多 sandbox 隔离、完整 RFC 生命周期 |
 
 ### 关键证据摘要
 
@@ -108,6 +109,8 @@ E2B 内核 6.1.158 **禁用了** `CONFIG_NETFILTER_XT_MATCH_OWNER`（legacy ipta
 | **磁盘满** | cert gen 95ms 快速失败不挂起，proxy 存活 | 15 A2-A3 |
 | **20 host 并发 cert** | 20 real hosts → 20 MITM certs，零 cert 失败 | 13 E2 |
 | **混合工作负载** | 10 HTTP + 5 bypass + 5 MITM 并发，零 ECONNRESET | 12 E2 |
+| **setStartCmd build 路径** | Template SDK 构建真实模板 → sandbox 创建即 proxy + nft 就绪 → UID 豁免有效 | 16 A1-B10 |
+| **Template sandbox 多实例隔离** | 同 template 创建多 sandbox，proxy/nft 独立，请求不串 | 16 D1-D5 |
 
 ### 仍待验证（需新代码实施后）
 
@@ -115,9 +118,8 @@ E2B 内核 6.1.158 **禁用了** `CONFIG_NETFILTER_XT_MATCH_OWNER`（legacy ipta
 |----------|------|
 | `--passthrough` CLI flag | proxy-adapter 代码不存在（需实现） |
 | `/__activate-mitm` 在真实 proxy-adapter 中 | 端点代码不存在（需实现，热切换已用独立实现验证） |
-| `setStartCmd` template build | 需修改 `paraflow-hq/sandbox` template.py |
 
-这 3 项是**尚未编写的新代码**。其中热切换机制已通过独立实现（`passthrough-hotswitch.mjs`）在真实 E2B 环境中完整验证（Suite 10-12），实施时可直接参考。
+这 2 项是**尚未编写的新代码**。其中热切换机制已通过独立实现（`passthrough-hotswitch.mjs`）在真实 E2B 环境中完整验证（Suite 10-12），`setStartCmd` build 路径已通过 Suite 16 在真实 E2B 环境中完整验证。
 
 ### 源码覆盖率
 
@@ -186,6 +188,7 @@ pnpm test:edge <key>           # 12: 生产边缘场景（32 tests）
 pnpm test:stress <key>         # 13: 压力与韧性（25 tests）
 pnpm test:moxt <key>           # 14: moxt 代码路径（21 tests）
 pnpm test:final <key>          # 15: 终极覆盖（29 tests）
+pnpm test:template <key>       # 16: setStartCmd 模板构建（29 tests）
 ```
 
 ## 文件结构
@@ -208,7 +211,8 @@ tests/
 ├── 12-production-edge-cases.cjs # 生产边缘场景（32）
 ├── 13-stress-and-resilience.cjs # 压力与韧性（25）
 ├── 14-moxt-code-paths.cjs     # moxt 代码路径（21）
-└── 15-final-coverage.cjs      # 终极覆盖（29）
+├── 15-final-coverage.cjs      # 终极覆盖（29）
+└── 16-setStartCmd-template-build.cjs # setStartCmd 模板构建（29）
 
 fixtures/
 ├── proxy.py                   # Python proxy 模拟器（Suite 01-05）

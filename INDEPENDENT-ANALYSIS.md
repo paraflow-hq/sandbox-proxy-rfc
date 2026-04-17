@@ -164,7 +164,7 @@ CONFIG_NF_TABLES=y                               ← nft meta skuid 可用
 
 ## 8. 测试证据
 
-RFC 包含 253 项自动化测试（15 套件），运行在**真实 E2B sandbox** 中（非 mock），包括使用真实 proxy-adapter.js 的应用层测试和 passthrough → MITM 热切换验证。
+RFC 包含 282 项自动化测试（16 套件），运行在**真实 E2B sandbox** 中（非 mock），包括使用真实 proxy-adapter.js 的应用层测试、passthrough → MITM 热切换验证，以及通过 E2B Template SDK `setStartCmd` API 构建真实模板的生产 build 路径验证。
 
 ### 攻击复现测试（对抗性套件）
 
@@ -199,7 +199,7 @@ RFC 包含 253 项自动化测试（15 套件），运行在**真实 E2B sandbox
 | 维护负担位置 | 运行时（生产事故） | 构建时（CI 失败） |
 | 代理迭代速度 | 更快（无需重建模板） | 更慢（需重建模板） |
 | 系统复杂度 | 更低（单一代理模式） | 更高（双模式 + 热切换） |
-| 自动化测试覆盖 | 未记录 | 253 项测试（15 套件），在真实 E2B sandbox 中运行 |
+| 自动化测试覆盖 | 未记录 | 282 项测试（16 套件），在真实 E2B sandbox 中运行（含 setStartCmd 模板构建验证） |
 
 ## 10. 结论
 

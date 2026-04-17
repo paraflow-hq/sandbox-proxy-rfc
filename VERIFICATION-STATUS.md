@@ -1,6 +1,6 @@
 # 验证状态
 
-## 总计：15 套件 253 项，全部通过 ✅
+## 总计：16 套件 282 项，全部通过 ✅
 
 所有测试在真实 E2B sandbox 中执行，非 mock。
 
@@ -55,13 +55,37 @@
 |------|--------|------|
 | 15-final-coverage | 29/29 | 磁盘满 cert gen、缺失 update-ca-certificates、invalid JSON、截断 body、客户端中断、坏 TLS 数据、同 host 并发 cert、缺失 Host header |
 
+## setStartCmd 模板构建：1 套件 29 项 ✅
+
+使用 E2B Template SDK `setStartCmd` API 构建真实模板，验证生产 build 路径（Suite 01-15 全部使用运行时 setup）。
+
+| 套件 | 测试数 | 结果 |
+|------|--------|------|
+| 16-setStartCmd-template-build | 29/29 | Template SDK 构建成功、proxy 以 mitmproxy 用户从 snapshot 存活、nft rules/counters 存在、HTTP/HTTPS 拦截、UID 豁免、snapshot/restore、多 sandbox 隔离、prep 20 请求零 ECONNRESET、activate-mitm 模式切换、post-MITM snapshot 存活 |
+
+### Suite 16 关键证据
+
+| 验证目标 | 证据 | 测试 |
+|---------|------|------|
+| `setStartCmd` build 成功 | templateId 返回，proxy + nft 在 build 日志中启动 | A1 |
+| Proxy 从 snapshot 存活 | `ps aux` 显示 python3 进程 ALIVE | B1 |
+| Proxy 以 mitmproxy 用户运行 | `/proc/<pid>/status` Uid=999 → USER=mitmproxy | B3 |
+| nft 规则从创建即生效 | `nft list ruleset` 包含 skuid + redirect 80 + redirect 443 | B4 |
+| HTTP 拦截 | root curl → `OK path=/get mode=passthrough` | B6 |
+| UID 豁免 | mitmproxy curl → httpbin 真实 JSON（不经 proxy） | B7 |
+| HTTPS 拦截 | root TCP → `TLS_PASSTHROUGH_REACHED` | B8 |
+| Snapshot/restore | proxy + nft + UID 豁免在 pause/resume 后全部存活 | C1-C5 |
+| 多 sandbox 隔离 | 同 template 两 sandbox，请求不串 | D1-D5 |
+| Prep 零 ECONNRESET | 20 sequential requests，零错误 | E1-E2 |
+| activate-mitm | `/__activate-mitm` → `"activated": true` → mode=mitm | E3-E4 |
+| Post-MITM snapshot | proxy + nft 在 MITM 激活后 snapshot/restore 存活 | E6-E8 |
+
 ## 仍待验证（需新代码实施后）
 
 | 待验证项 | 阻塞原因 |
 |----------|----------|
 | proxy-adapter `--passthrough` 模式 | 代码不存在（需实现） |
 | `/__activate-mitm` 在真实 proxy-adapter 中 | 代码不存在（需实现，热切换已用独立实现验证） |
-| `setStartCmd` template build | 需修改 `paraflow-hq/sandbox` template.py |
 
 ## 测试中发现的实施注意事项
 
