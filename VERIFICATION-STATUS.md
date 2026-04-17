@@ -1,6 +1,6 @@
 # 验证状态
 
-## 总计：18 套件 331 项，全部通过 ✅
+## 总计：19 套件 355 项，全部通过 ✅
 
 所有测试在真实 E2B sandbox 中执行，非 mock。
 
@@ -115,9 +115,17 @@
 | Snapshot 存活 | proxy + nft + MITM 模式在 restore 后全部存活 | E1-E5 |
 | 幂等激活 | 双次 activate 不 crash，MITM 继续工作 | F1-F3 |
 
+## 生产精确路径：真实 proxy-adapter --passthrough + setStartCmd：1 套件 24 项 ✅
+
+Suite 16 用 Python proxy + setStartCmd。Suite 18 用真实 proxy-adapter --passthrough + 运行时 setup。Suite 19 测的是两者的交叉——生产部署的精确路径。
+
+| 套件 | 测试数 | 结果 |
+|------|--------|------|
+| 19-template-real-passthrough | 24/24 | Template SDK 构建真实 proxy-adapter.js --passthrough + nft、passthrough 从 birth、10 请求零 ECONNRESET、真实上游证书、activate-mitm → MITM 证书、二次 snapshot 存活、多 sandbox 隔离 + 独立激活 |
+
 ## 仍待验证（无）
 
-所有待验证项已全部完成。
+所有待验证项已全部完成。包括生产部署的精确路径。
 
 ## 测试中发现的实施注意事项
 

@@ -69,9 +69,9 @@ E2B 内核 6.1.158 **禁用了** `CONFIG_NETFILTER_XT_MATCH_OWNER`（legacy ipta
 
 ## 验证状态
 
-### 18 套件 331 项，全部通过 ✅
+### 19 套件 355 项，全部通过 ✅
 
-所有测试在**真实 E2B sandbox** 中执行，包含 Firecracker snapshot/restore 周期。Suite 07-15 使用**真实 rspack 构建的 proxy-adapter.js（24KB bundle）**。Suite 10-11 使用**自写的 passthrough → MITM 热切换实现**验证 RFC 核心新机制。Suite 16 使用 **E2B Template SDK `setStartCmd` API** 构建真实模板，验证生产 build 路径。Suite 17 覆盖 **WebSocket（ws:// / wss://）** 透明代理行为。Suite 18 使用**真实 proxy-adapter.js 的 `--passthrough` + `/__activate-mitm`** 验证 RFC 完整热切换机制。
+所有测试在**真实 E2B sandbox** 中执行，包含 Firecracker snapshot/restore 周期。Suite 07-15 使用**真实 rspack 构建的 proxy-adapter.js（24KB bundle）**。Suite 10-11 使用**自写的 passthrough → MITM 热切换实现**验证 RFC 核心新机制。Suite 16 使用 **E2B Template SDK `setStartCmd` API** 构建真实模板，验证生产 build 路径。Suite 17 覆盖 **WebSocket（ws:// / wss://）** 透明代理行为。Suite 18 使用**真实 proxy-adapter.js 的 `--passthrough` + `/__activate-mitm`** 验证 RFC 完整热切换机制。Suite 19 验证**真实 proxy-adapter.js --passthrough + setStartCmd 模板构建**——生产部署的精确路径。
 
 | 套件 | 测试数 | 使用的代理 | 覆盖内容 |
 |------|--------|-----------|---------|
@@ -93,6 +93,7 @@ E2B 内核 6.1.158 **禁用了** `CONFIG_NETFILTER_XT_MATCH_OWNER`（legacy ipta
 | **16-setStartCmd-template-build** | 29 ✅ | **Template SDK build** | `setStartCmd` 真实模板构建、proxy + nft 从 sandbox 创建即生效、UID 豁免、snapshot/restore、多 sandbox 隔离、完整 RFC 生命周期 |
 | **17-websocket** | 25 ✅ | **真实 bundle + 热切换** | ws:// HTTP Upgrade 优雅处理、wss:// passthrough TCP 隧道全双工 echo、wss:// MITM TLS 终止、并发 WebSocket 韧性、UID 豁免 WebSocket 绕过 |
 | **18-real-passthrough-activate-mitm** | 24 ✅ | **真实 bundle（含 --passthrough + /__activate-mitm）** | passthrough 启动无 CA、health 报告模式、HTTP 直转、HTTPS 真实上游证书、激活 MITM 后 HTTPS 获得 Moxt CA 证书、snapshot/restore 存活、幂等激活 |
+| **19-template-real-passthrough** | 24 ✅ | **真实 bundle --passthrough + Template SDK build** | 生产精确路径：setStartCmd 烘焙真实 proxy-adapter.js --passthrough + nft 规则、passthrough 从 sandbox 创建即生效、activate-mitm、MITM 证书、二次 snapshot 存活、多 sandbox 隔离 + 独立激活 |
 
 ### 关键证据摘要
 
@@ -118,10 +119,12 @@ E2B 内核 6.1.158 **禁用了** `CONFIG_NETFILTER_XT_MATCH_OWNER`（legacy ipta
 | **真实 --passthrough 启动** | proxy-adapter.js `--passthrough` 无 CA 启动，health 报告 passthrough | 18 A1-A4 |
 | **真实 /__activate-mitm** | CA 生成 → POST /__activate-mitm → HTTPS 获得 Moxt CA 证书 | 18 C3-D2 |
 | **Passthrough → MITM snapshot** | passthrough → activate → snapshot → restore → MITM 仍生效 | 18 E1-E5 |
+| **生产精确路径** | 真实 proxy-adapter.js --passthrough + setStartCmd 模板构建 → passthrough 从 birth → activate → MITM cert → 二次 snapshot | 19 全部 |
+| **Template 多 sandbox 独立激活** | 同 template 两 sandbox，各自独立 passthrough → 独立 activate → 独立 MITM | 19 F1-F4 |
 
 ### 仍待验证（无）
 
-所有待验证项已全部完成。`--passthrough` CLI flag 和 `/__activate-mitm` 端点已在真实 proxy-adapter.js bundle 中实现并通过 Suite 18（24/24）在真实 E2B 环境中验证。
+所有待验证项已全部完成。包括生产部署的精确路径（真实 proxy-adapter.js --passthrough + setStartCmd 模板构建）已通过 Suite 19（24/24）在真实 E2B 环境中验证。
 
 ### 源码覆盖率
 
@@ -193,6 +196,7 @@ pnpm test:final <key>          # 15: 终极覆盖（29 tests）
 pnpm test:template <key>       # 16: setStartCmd 模板构建（29 tests）
 pnpm test:websocket <key>      # 17: WebSocket 透明代理（25 tests）
 pnpm test:passthrough <key>    # 18: 真实 --passthrough + /__activate-mitm（24 tests）
+pnpm test:template-passthrough <key> # 19: 真实 --passthrough + setStartCmd 模板构建（24 tests）
 ```
 
 ## 文件结构
@@ -218,7 +222,8 @@ tests/
 ├── 15-final-coverage.cjs      # 终极覆盖（29）
 ├── 16-setStartCmd-template-build.cjs # setStartCmd 模板构建（29）
 ├── 17-websocket.cjs           # WebSocket 透明代理（25）
-└── 18-real-passthrough-activate-mitm.cjs # 真实 --passthrough + /__activate-mitm（24）
+├── 18-real-passthrough-activate-mitm.cjs # 真实 --passthrough + /__activate-mitm（24）
+└── 19-template-real-passthrough.cjs # 真实 --passthrough + setStartCmd 模板构建（24）
 
 fixtures/
 ├── proxy.py                   # Python proxy 模拟器（Suite 01-05）

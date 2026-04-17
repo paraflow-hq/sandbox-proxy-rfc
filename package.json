@@ -22,7 +22,8 @@
     "test:final": "node tests/15-final-coverage.cjs",
     "test:template": "node tests/16-setStartCmd-template-build.cjs",
     "test:websocket": "node tests/17-websocket.cjs",
-    "test:passthrough": "node tests/18-real-passthrough-activate-mitm.cjs"
+    "test:passthrough": "node tests/18-real-passthrough-activate-mitm.cjs",
+    "test:template-passthrough": "node tests/19-template-real-passthrough.cjs"
   },
   "dependencies": {
     "@e2b/code-interpreter": "2.3.1",
