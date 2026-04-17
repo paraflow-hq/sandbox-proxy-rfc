@@ -8,7 +8,8 @@
     "test:components": "node tests/01-components.cjs",
     "test:e2e": "node tests/02-e2e-lifecycle.cjs",
     "test:gaps": "node tests/03-gap-coverage.cjs",
-    "test:adversarial": "node tests/04-adversarial.cjs"
+    "test:adversarial": "node tests/04-adversarial.cjs",
+    "test:reality": "node tests/05-production-reality.cjs"
   },
   "dependencies": {
     "@e2b/code-interpreter": "2.3.1",

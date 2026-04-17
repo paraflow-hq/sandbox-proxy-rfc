@@ -104,6 +104,8 @@ def tls_server():
 
 threading.Thread(target=tls_server, daemon=True).start()
 
+socketserver.ThreadingTCPServer.allow_reuse_address = True
+
 with socketserver.ThreadingTCPServer(("", HTTP_PORT), ProxyHandler) as httpd:
     httpd.daemon_threads = True
     print(f"Proxy on :{HTTP_PORT} (HTTP) :{TLS_PORT} (TLS)", flush=True)

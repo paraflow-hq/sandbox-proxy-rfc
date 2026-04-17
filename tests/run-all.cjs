@@ -18,6 +18,7 @@ const suites = [
   { name: '02-e2e-lifecycle', file: '02-e2e-lifecycle.cjs' },
   { name: '03-gap-coverage', file: '03-gap-coverage.cjs' },
   { name: '04-adversarial', file: '04-adversarial.cjs' },
+  { name: '05-production-reality', file: '05-production-reality.cjs' },
 ]
 
 const results = []
